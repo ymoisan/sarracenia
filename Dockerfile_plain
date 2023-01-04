@@ -18,19 +18,28 @@ ENV sr3_conf swob
 
 #RUN apt update && apt-get -y install  \
 #    && adduser --disabled-password --gecos '' g2c
-RUN apt-get update &&  apt-get install -y curl gnupg software-properties-common sudo
 
-RUN adduser --disabled-password --gecos '' g2c && adduser g2c sudo
-RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# Add blobfuse2 as root
+# RUN apt-get update && apt-get install -y curl gnupg software-properties-common \ 
+#    && curl -sSL https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
+#    && apt-add-repository https://packages.microsoft.com/ubuntu/22.04/prod && apt-get update \
+#    && apt-get -y install blobfuse2 \
+
+# Add sr3
+RUN apt-get update && apt-get install -y gnupg software-properties-common \ 
+    && add-apt-repository ppa:ssc-hpc-chp-spc/metpx && apt update \
+    && apt-get -y install metpx-sr3 python3-amqp
+
+## FROM python:3.10-slim-bullseye as sr3
+## # Copy artifact from builder stage                   
+## COPY --from=base /usr/lib/python3/* /usr/local/lib/python3/
+## COPY --from=base /usr/bin/sr3 /usr/local/bin/
+
+RUN adduser --disabled-password --gecos '' g2c
 
 USER g2c
 WORKDIR /home/g2c
-
-RUN sudo curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add - \
-    && sudo apt-add-repository https://packages.microsoft.com/ubuntu/22.04/prod && sudo apt-get update \
-    && sudo apt-get -y install blobfuse2 \
-    && sudo add-apt-repository ppa:ssc-hpc-chp-spc/metpx && sudo apt update \
-    && sudo apt-get -y install metpx-sr3 python3-amqp
 
 # We have to create directories in /home/g2c for sr3 to work
 # IMPORTANT : Running this image needs each of the 5 directories to be mapped to localhost directories
@@ -45,10 +54,10 @@ RUN sudo curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-
 # -v /localhost_fuse-mounted_dir:/home/g2c/.config/sr3/output \
 # image
 RUN mkdir -p /home/g2c/.config/sr3/subscribe \
-##    && mkdir -p /home/g2c/.config/sr3/log \
-##     && mkdir -p /home/g2c/.cache/sr3/subscribe \
-##     && mkdir -p /home/g2c/.cache/sr3/log \
-   && mkdir -p /home/g2c/.config/sr3/output
+    && mkdir -p /home/g2c/.config/sr3/log \
+    && mkdir -p /home/g2c/.cache/sr3/subscribe \
+    && mkdir -p /home/g2c/.cache/sr3/log \
+    && mkdir -p /home/g2c/.config/sr3/output
    # && cp /usr/lib/python3/dist-packages/sarracenia/examples/subscribe/dd_swob.conf /home/g2c/.config/sr3/subscribe
 # TODO : ADD A STAGE TO KEEP SR3 ONLY
 CMD sr3 start subscribe/$sr3_conf && sleep $duration && sr3 stop subscribe/$sr3_conf && sleep 10
