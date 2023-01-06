@@ -1,6 +1,6 @@
 # Steps
 # Install Sarracenia (sr) v3 from apt
-# Define a TARGET_DIR for sr v3 subscriptions
+# Install blobfuse2
 #
 # Intended usage : mount TARGET_DIR to an existing directory on host which itself is FUSE mounted to cloud storage
 # e.g. via `s3fs` fow S3 buckets or `blobfuse2` for Azure blob storage containers
@@ -15,6 +15,8 @@ LABEL org.opencontainers.image.authors="yves.moisan@ec.gc.ca"
 ENV duration 60
 # sr3 configuration file
 ENV sr3_conf swob
+# name of blobfuse2 configuration file to be supplied at run time
+ENV blobfuse2_conf blobfuse2_config.yaml
 
 #RUN apt update && apt-get -y install  \
 #    && adduser --disabled-password --gecos '' g2c
@@ -45,11 +47,14 @@ RUN sudo curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-
 # -v /localhost_fuse-mounted_dir:/home/g2c/.config/sr3/output \
 # image
 RUN mkdir -p /home/g2c/.config/sr3/subscribe \
+    && mkdir -p /home/g2c/.config/blobfuse2 \
 ##    && mkdir -p /home/g2c/.config/sr3/log \
 ##     && mkdir -p /home/g2c/.cache/sr3/subscribe \
 ##     && mkdir -p /home/g2c/.cache/sr3/log \
    && mkdir -p /home/g2c/.config/sr3/output
-   # && cp /usr/lib/python3/dist-packages/sarracenia/examples/subscribe/dd_swob.conf /home/g2c/.config/sr3/subscribe
-# TODO : ADD A STAGE TO KEEP SR3 ONLY
-CMD sr3 start subscribe/$sr3_conf && sleep $duration && sr3 stop subscribe/$sr3_conf && sleep 10
+
+# Next step will succeed only if blobfuse2 credentials are mapped from the host
+# to /home/g2c/.config/sr3/subscribe at run time
+CMD sudo blobfuse2 mount /home/g2c/.config/sr3/output --config-file=/home/g2c/.config/blobfuse2/$blobfuse2_conf \ 
+    && sudo sr3 start subscribe/$sr3_conf && sleep $duration && sudo sr3 stop subscribe/$sr3_conf && sleep 10
 
