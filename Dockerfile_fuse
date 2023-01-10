@@ -39,28 +39,17 @@ RUN sudo curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-
 # The following cannot be done in the previous `RUN` e.g. after `chmod`; raises permission issues
 RUN sudo echo 'user_allow_other' >> /etc/fuse.conf
 # We have to create directories in /home/g2c for sr3 to work
-# IMPORTANT : Running this image needs each of the 5 directories to be mapped to localhost directories
+# IMPORTANT : Running this image needs one docker mount to
 # e.g.
 # docker run -d \
-# -e duration=10 \
-# -e sr3_conf=swob \
-# -v /localhost_config_dir/subscribe:/home/g2c/.config/sr3/subscribe \
-# -v /localhost_config_dir/log:/home/g2c/.config/sr3/log \
-# -v /localhost_cache_dir/subscribe:/home/g2c/.cache/sr3/subscribe \
-# -v /localhost_cache_dir/log:/home/g2c/.cache/sr3/log \
-# -v /localhost_fuse-mounted_dir:/home/g2c/.config/sr3/output \
+# -e sr3_conf=swob -e duration=1000 -e blobfuse2_conf=blobfuse2_conf_yaml \
+# --cap-add=SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined \ 
+# -v /home/yves/.config/sr3/:/home/g2c/.config/sr3/ ymoisan/sr3-fuse  \
 # image
 RUN mkdir -p /home/g2c/.config/sr3/ && \
 mkdir -p /home/g2c/.blobfuse2
-##    && mkdir -p /home/g2c/.config/blobfuse2 \
-##    && mkdir -p /home/g2c/.config/sr3/log \
-##     && mkdir -p /home/g2c/.cache/sr3/subscribe \
-##     && mkdir -p /home/g2c/.cache/sr3/log \
-##   && mkdir -p /home/g2c/.config/sr3/output
 
-# Next step will succeed only if blobfuse2 credentials are mapped from the host
-# to /home/g2c/.config/sr3/subscribe at run time
-CMD mkdir -p /home/g2c/.config/sr3/output \
- && blobfuse2 mount /home/g2c/.config/sr3/output --config-file=/home/g2c/.config/sr3/blobfuse2/$blobfuse2_conf \ 
+CMD mkdir -p /home/g2c/output \
+ && blobfuse2 mount /home/g2c/output --config-file=/home/g2c/.config/sr3/blobfuse2/$blobfuse2_conf \ 
     && sr3 start subscribe/$sr3_conf && sleep $duration && sr3 stop subscribe/$sr3_conf && sleep 20
 
