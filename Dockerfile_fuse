@@ -23,7 +23,8 @@ ENV blobfuse2_conf blobfuse2_config.yaml
 RUN apt-get update &&  apt-get install -y curl gnupg software-properties-common sudo
 
 RUN adduser --disabled-password --gecos '' g2c && adduser g2c sudo
-RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers 
+## \   && sudo echo 'user_allow_other' >> /etc/fuse.conf
 
 USER g2c
 WORKDIR /home/g2c
@@ -31,9 +32,12 @@ WORKDIR /home/g2c
 RUN sudo curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add - \
     && sudo apt-add-repository https://packages.microsoft.com/ubuntu/22.04/prod && sudo apt-get update \
     && sudo apt-get -y install blobfuse2 \
+    && sudo chmod 777 /etc/fuse.conf \
     && sudo add-apt-repository ppa:ssc-hpc-chp-spc/metpx && sudo apt update \
     && sudo apt-get -y install metpx-sr3 python3-amqp
 
+# The following cannot be done in the previous `RUN` e.g. after `chmod`; raises permission issues
+RUN sudo echo 'user_allow_other' >> /etc/fuse.conf
 # We have to create directories in /home/g2c for sr3 to work
 # IMPORTANT : Running this image needs each of the 5 directories to be mapped to localhost directories
 # e.g.
@@ -46,15 +50,17 @@ RUN sudo curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-
 # -v /localhost_cache_dir/log:/home/g2c/.cache/sr3/log \
 # -v /localhost_fuse-mounted_dir:/home/g2c/.config/sr3/output \
 # image
-RUN mkdir -p /home/g2c/.config/sr3/subscribe \
-    && mkdir -p /home/g2c/.config/blobfuse2 \
+RUN mkdir -p /home/g2c/.config/sr3/ && \
+mkdir -p /home/g2c/.blobfuse2
+##    && mkdir -p /home/g2c/.config/blobfuse2 \
 ##    && mkdir -p /home/g2c/.config/sr3/log \
 ##     && mkdir -p /home/g2c/.cache/sr3/subscribe \
 ##     && mkdir -p /home/g2c/.cache/sr3/log \
-   && mkdir -p /home/g2c/.config/sr3/output
+##   && mkdir -p /home/g2c/.config/sr3/output
 
 # Next step will succeed only if blobfuse2 credentials are mapped from the host
 # to /home/g2c/.config/sr3/subscribe at run time
-CMD sudo blobfuse2 mount /home/g2c/.config/sr3/output --config-file=/home/g2c/.config/blobfuse2/$blobfuse2_conf \ 
-    && sudo sr3 start subscribe/$sr3_conf && sleep $duration && sudo sr3 stop subscribe/$sr3_conf && sleep 10
+CMD mkdir -p /home/g2c/.config/sr3/output \
+ && blobfuse2 mount /home/g2c/.config/sr3/output --config-file=/home/g2c/.config/sr3/blobfuse2/$blobfuse2_conf \ 
+    && sr3 start subscribe/$sr3_conf && sleep $duration && sr3 stop subscribe/$sr3_conf && sleep 20
 
