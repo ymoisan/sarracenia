@@ -46,10 +46,16 @@ RUN sudo echo 'user_allow_other' >> /etc/fuse.conf
 # --cap-add=SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined \ 
 # -v /home/yves/.config/sr3/:/home/g2c/.config/sr3/ ymoisan/sr3-fuse  \
 # image
-RUN mkdir -p /home/g2c/.config/sr3/ && \
-mkdir -p /home/g2c/.blobfuse2
 
-# The default value for connection timeout is 60 seconds.  Override it to twelve hours : 43200
-CMD mkdir -p /home/g2c/output \
-     && blobfuse2 mount /home/g2c/output --timeout=43200 --config-file=/home/g2c/.config/sr3/blobfuse2/$blobfuse2_conf \ 
-    && sr3 start subscribe/$sr3_conf && sleep $duration && sr3 stop subscribe/$sr3_conf && sleep 20 && exit
+ENV blob_path cmc
+RUN mkdir -p /home/g2c/.config/sr3/subscribe && mkdir -p /home/g2c/.blobfuse2
+#    && cd /home/g2c/.config/sr3/ \
+#    && key_value=`cat $PWD/subscribe/$conf_file_name | grep ^directory` && blob_path='echo ${key_value[1]}'
+
+CMD epoch_microsec=`date +%s%6N` && orig=`echo $sr3_conf`.conf && dest=`echo $sr3_conf'_'$epoch_microsec`.conf \
+    && cd /home/g2c/.config/sr3/subscribe  \
+    && cp $orig $dest && echo "directory /home/g2c/output/$blob_path\naccept .*" >> $dest \ 
+    && mkdir -p /home/g2c/output/ \
+    && blobfuse2 mount /home/g2c/output/ --config-file=/home/g2c/.config/sr3/blobfuse2/$blobfuse2_conf \ 
+    && sr3 start subscribe/$sr3_conf'_'$epoch_microsec && sleep $duration \ 
+    && sr3 stop subscribe/$sr3_conf'_'$epoch_microsec && sleep 20 && exit
