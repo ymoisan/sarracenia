@@ -5,10 +5,16 @@
 # Intended usage : Ouptput to localdir on host running docker.  Shown below is running the image built as :
 # docker build -t ymoisan/sr3-local -f Dockerfile_local .
 #
-# docker run -d -e sr3_conf=swob_hpfx -e duration=100 
+
+# docker run -d -e sr3_conf=swob -e blob_path=swob-test-yves -e duration=3600 
 # -v /home/yves/.config/sr3/subscribe:/home/g2c/.config/sr3/subscribe 
-# -v /home/yves/azure/sarra:/home/g2c/.config/sr3/output 
+# -v /home/yves/azure/sarra_mount:/home/g2c/output 
 # ymoisan/sr3-local
+#
+# where environment variables passed to the container (-e) are :
+# - sr3_conf : the name of sr3 configuration file located in the `subscribe` directory of /home/yves/.config/sr3/subscribe
+# - blob_path : the name of the sub-directory in /home/yves/azure/sarra_mount where files will end u
+# - duration : container time to live in seconds
 
 # IMPORTANT : mapping the container's `home/g2c/.config/sr3/output` directory to a local directory
 # which is ITSELF FUSE mounted to cloud storage has the effect of uploading files on the cloud.  
@@ -32,16 +38,9 @@ RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 USER g2c
 WORKDIR /home/g2c
 
-# Add blobfuse2 as root
-# RUN apt-get update && apt-get install -y curl gnupg software-properties-common \ 
-#    && curl -sSL https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
-#    && apt-add-repository https://packages.microsoft.com/ubuntu/22.04/prod && apt-get update \
-#    && apt-get -y install blobfuse2 \
-
 # Add sr3
 RUN sudo add-apt-repository ppa:ssc-hpc-chp-spc/metpx && sudo apt update \
     && sudo apt-get -y install metpx-sr3 python3-amqp
-
 
 # We have to create directories in /home/g2c for sr3 to work
 # IMPORTANT : Running this image needs each of the 5 directories to be mapped to localhost directories
@@ -55,9 +54,18 @@ RUN sudo add-apt-repository ppa:ssc-hpc-chp-spc/metpx && sudo apt update \
 # -v /localhost_cache_dir/log:/home/g2c/.cache/sr3/log \
 # -v /localhost_fuse-mounted_dir:/home/g2c/.config/sr3/output \
 # image
-RUN mkdir -p /home/g2c/.config/sr3/subscribe \
-    && mkdir -p /home/g2c/.config/sr3/output
+
+ENV blob_path cmc
+
+RUN mkdir -p /home/g2c/.config/sr3/subscribe
    # && cp /usr/lib/python3/dist-packages/sarracenia/examples/subscribe/dd_swob.conf /home/g2c/.config/sr3/subscribe
 # TODO : ADD A STAGE TO KEEP SR3 ONLY
-CMD sr3 start subscribe/$sr3_conf && sleep $duration && sr3 stop subscribe/$sr3_conf && sleep 10
+
+# OLD CMD sr3 start subscribe/$sr3_conf && sleep $duration && sr3 stop subscribe/$sr3_conf && sleep 10
+CMD epoch_microsec=`date +%s%6N` && orig=`echo $sr3_conf`.conf && dest=`echo $sr3_conf'_'$epoch_microsec`.conf \
+    && cd /home/g2c/.config/sr3/subscribe  \
+    && cp $orig $dest && echo "directory /home/g2c/output/$blob_path\naccept .*" >> $dest \ 
+    && mkdir -p /home/g2c/output/ \
+    && sr3 start subscribe/$sr3_conf'_'$epoch_microsec && sleep $duration \ 
+    && sr3 stop subscribe/$sr3_conf'_'$epoch_microsec && sleep 20 && exit
 

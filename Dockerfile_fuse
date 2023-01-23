@@ -2,11 +2,19 @@
 # Install Sarracenia (sr) v3 from apt
 # Install blobfuse2
 #
-# Intended usage : mount TARGET_DIR to an existing directory on host which itself is FUSE mounted to cloud storage
-# e.g. via `s3fs` fow S3 buckets or `blobfuse2` for Azure blob storage containers
-# 
-# As a result, files written in TARGET_DIR get written to the cloud by virtue of TARGET_DIR being mapped to cloud.
-# FUSE mounting directories on the host mean no credentials are included in -- or need to be passed to -- the image
+# IMPORTANT : Running this image needs one docker mount to pass sr3 configuration from localhost
+# e.g.
+# docker run -d \
+# -e sr3_conf=swob -e duration=1000 -e blobfuse2_conf=blobfuse2_conf_yaml \
+# --cap-add=SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined \ 
+# -v /home/yves/.config/sr3/:/home/g2c/.config/sr3/ ymoisan/sr3-fuse  \
+# image
+#
+# where environment variables passed to the container (-e) are :
+# - sr3_conf : the name of sr3 configuration file located in the `subscribe` directory of /home/yves/.config/sr3/subscribe
+# - blob_path : the name of the sub-directory in /home/yves/azure/sarra_mount where files will end u
+# - duration : container time to live in seconds
+
 FROM ubuntu:22.04 as base
 # FROM python:3.10-slim-bullseye as base
 LABEL org.opencontainers.image.authors="yves.moisan@ec.gc.ca"
@@ -39,13 +47,6 @@ RUN sudo curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-
 # The following cannot be done in the previous `RUN` e.g. after `chmod`; raises permission issues
 RUN sudo echo 'user_allow_other' >> /etc/fuse.conf
 # We have to create directories in /home/g2c for sr3 to work
-# IMPORTANT : Running this image needs one docker mount to
-# e.g.
-# docker run -d \
-# -e sr3_conf=swob -e duration=1000 -e blobfuse2_conf=blobfuse2_conf_yaml \
-# --cap-add=SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined \ 
-# -v /home/yves/.config/sr3/:/home/g2c/.config/sr3/ ymoisan/sr3-fuse  \
-# image
 
 ENV blob_path cmc
 RUN mkdir -p /home/g2c/.config/sr3/subscribe && mkdir -p /home/g2c/.blobfuse2
