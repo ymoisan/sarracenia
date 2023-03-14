@@ -26,6 +26,10 @@ ENV sr3_conf swob
 # name of blobfuse2 configuration file to be supplied at run time
 ENV blobfuse2_conf blobfuse2_config.yaml
 
+# Configuration for post broker
+ENV post_broker None
+ENV post_exchange None
+
 #RUN apt update && apt-get -y install  \
 #    && adduser --disabled-password --gecos '' g2c
 RUN apt-get update &&  apt-get install -y curl gnupg software-properties-common sudo
@@ -42,7 +46,7 @@ RUN sudo curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo apt-
     && sudo apt-get -y install blobfuse2 \
     && sudo chmod 777 /etc/fuse.conf \
     && sudo add-apt-repository ppa:ssc-hpc-chp-spc/metpx && sudo apt update \
-    && sudo apt-get -y install metpx-sr3 python3-amqp
+    && sudo apt-get -y install metpx-sr3 python3-amqp python3-azure python3-paho-mqtt mosquitto-clients
 
 # The following cannot be done in the previous `RUN` e.g. after `chmod`; raises permission issues
 RUN sudo echo 'user_allow_other' >> /etc/fuse.conf
@@ -53,9 +57,12 @@ RUN mkdir -p /home/g2c/.config/sr3/subscribe && mkdir -p /home/g2c/.blobfuse2
 #    && cd /home/g2c/.config/sr3/ \
 #    && key_value=`cat $PWD/subscribe/$conf_file_name | grep ^directory` && blob_path='echo ${key_value[1]}'
 
+CMD echo "post_broker = $post_broker"
 CMD epoch_microsec=`date +%s%6N` && orig=`echo $sr3_conf`.conf && dest=`echo $sr3_conf'_'$epoch_microsec`.conf \
     && cd /home/g2c/.config/sr3/subscribe  \
-    && cp $orig $dest && echo "directory /home/g2c/output/$blob_path\naccept .*" >> $dest \ 
+    && cp $orig $dest \
+    && echo "directory /home/g2c/output/$blob_path\naccept .*\n" >> $dest \ 
+    && echo "post_broker $post_broker\npost_exchange $post_exchange" >> $dest \ 
     && mkdir -p /home/g2c/output/ \
     && blobfuse2 mount /home/g2c/output/ --config-file=/home/g2c/.config/sr3/blobfuse2/$blobfuse2_conf \ 
     && sr3 start subscribe/$sr3_conf'_'$epoch_microsec && sleep $duration \ 
